@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulateur Épargne Visuel</title>
+    <!-- Inclusion de Chart.js pour le graphique -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #6C63FF;
+            --secondary: #00c6fb;
+            --accent: #FF6584;
+            --bg: #f4f7f6;
+            --card: #ffffff;
+            --text: #2d3436;
+            --text-light: #636e72;
+            --radius: 16px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 900px;
+            background: var(--card);
+            border-radius: 24px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.05);
+            padding: 30px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 24px;
+            text-align: center;
+            margin: 0 0 10px 0;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-light);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        /* --- CONFIGURATION --- */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .config-full { grid-column: 1 / -1; }
+
+        .input-group label, .selector-group label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 8px;
+        }
+
+        .styled-input, .styled-select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            background: #fcfcfc;
+            font-size: 16px;
+            font-weight: 500;
+            box-sizing: border-box;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        .styled-input:focus, .styled-select:focus { border-color: var(--primary); }
+
+        /* --- RESULTATS COTE A COTE --- */
+        .results-wrapper {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .result-card {
+            flex: 1;
+            padding: 20px;
+            border-radius: var(--radius);
+            color: white;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        .card-source { background: linear-gradient(135deg, var(--primary), #8a84ff); }
+        .card-target { background: linear-gradient(135deg, var(--secondary), #00f2fe); color: #003459; }
+
+        .res-header { font-size: 12px; opacity: 0.9; margin-bottom: 5px; display: flex; justify-content: center; align-items: center; gap: 5px; }
+        .res-total { font-size: 28px; font-weight: 800; margin-bottom: 5px; }
+        .res-details { display: flex; justify-content: space-around; margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.2); }
+        .detail-val { font-weight: 700; font-size: 14px; }
+        .detail-lbl { font-size: 10px; opacity: 0.8; text-transform: uppercase; }
+
+        /* --- PHRASE EXPLICATIVE --- */
+        .explanation-box {
+            background: #f8f9fa;
+            border-left: 4px solid var(--primary);
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            border-radius: 0 8px 8px 0;
+            font-size: 14px;
+            color: var(--text);
+            line-height: 1.5;
+        }
+        .highlight { color: var(--primary); font-weight: 700; }
+        .highlight-success { color: #27ae60; font-weight: 700; }
+
+        /* --- GRAPHIQUE --- */
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+            margin-bottom: 30px;
+            background: #fff;
+            padding: 10px;
+            border-radius: var(--radius);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        /* --- FRISES CHRONOLOGIQUES --- */
+        .timelines-wrapper {
+            display: flex;
+            gap: 20px;
+        }
+
+        .timeline-col {
+            flex: 1;
+            background: #f9fafb;
+            border-radius: var(--radius);
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .tl-title {
+            text-align: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-light);
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .timeline { position: relative; padding-left: 15px; }
+        .timeline::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: #e0e0e0; }
+
+        .tl-item {
+            position: relative;
+            margin-bottom: 15px;
+            padding-left: 20px;
+            opacity: 0;
+            transform: translateY(5px);
+            animation: slideIn 0.3s forwards ease-out;
+        }
+        .tl-item::before {
+            content: '';
+            position: absolute;
+            left: -5px; top: 3px;
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid var(--primary);
+            z-index: 1;
+        }
+        .timeline-col.target .tl-item::before { border-color: var(--secondary); }
+
+        .tl-year { font-size: 12px; font-weight: 700; color: var(--primary); display: block; }
+        .timeline-col.target .tl-year { color: #0078a8; }
+        .tl-val { font-size: 14px; font-weight: 600; }
+
+        @keyframes slideIn { to { opacity: 1; transform: translateY(0); } }
+        .error-msg { color: #ff4757; font-size: 11px; text-align: right; margin-top: -10px; margin-bottom: 15px; display: none; }
+
+        @media (max-width: 768px) {
+            .results-wrapper, .timelines-wrapper { flex-direction: column; }
+            .app-container { padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h1>Simulateur d'Épargne Avancé</h1>
+    <div class="subtitle">Visualisez la puissance des intérêts composés</div>
+
+    <!-- CONFIGURATION -->
+    <div class="config-grid">
+        <div class="selector-group config-full">
+            <label>Type de placement</label>
+            <select id="accountType" class="styled-select" onchange="updateRate()">
+                <option value="0.03">Livret A / LDDS (3% net)</option>
+                <option value="0.06">LEP - Livret Épargne Populaire (6% net)</option>
+                <option value="0.02">PEL - Plan Épargne Logement (2%)</option>
+                <option value="0.025">Assurance Vie Fonds Euros (2.5%)</option>
+                <option value="0.08">Bourse / ETF Long Terme (8% brut)</option>
+                <option value="custom">Taux personnalisé</option>
+            </select>
+        </div>
+
+        <div class="input-group">
+            <label>Capital Initial</label>
+            <div style="position:relative;">
+                <input type="number" id="initial" class="styled-input" value="1000" oninput="calculate()">
+                <span id="symInit" style="position:absolute; right:15px; top:12px; color:#999;">€</span>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Versement Mensuel</label>
+            <div style="position:relative;">
+                <input type="number" id="monthly" class="styled-input" value="100" oninput="calculate()">
+                <span id="symMonth" style="position:absolute; right:15px; top:12px; color:#999;">€</span>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Rendement Annuel (%)</label>
+            <input type="number" id="rate" class="styled-input" value="3" step="0.1" oninput="calculate()">
+        </div>
+
+        <div class="input-group">
+            <label>Durée (Années)</label>
+            <input type="number" id="years" class="styled-input" value="20" oninput="calculate()">
+        </div>
+        <div id="yearError" class="error-msg config-full">Maximum 150 ans autorisé.</div>
+
+        <div class="selector-group">
+            <label>Devise Source</label>
+            <select id="srcCurrency" class="styled-select" onchange="calculate()">
+                <option value="EUR|€">🇪🇺 EUR - Euro</option>
+                <option value="USD|$">🇺🇸 USD - Dollar</option>
+                <option value="GBP|£">🇬🇧 GBP - Livre</option>
+                <option value="JPY|¥">🇯🇵 JPY - Yen</option>
+                <option value="VND|₫">🇻🇳 VND - Dong</option>
+            </select>
+        </div>
+
+        <div class="selector-group">
+            <label>Devise Cible</label>
+            <select id="tgtCurrency" class="styled-select" onchange="calculate()">
+                <option value="USD|$">🇺🇸 USD - Dollar</option>
+                <option value="EUR|€">🇪🇺 EUR - Euro</option>
+                <option value="GBP|£">🇬🇧 GBP - Livre</option>
+                <option value="JPY|¥">🇯🇵 JPY - Yen</option>
+                <option value="VND|₫">🇻🇳 VND - Dong</option>
+                <option value="CNY|¥">🇨🇳 CNY - Yuan</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- RESULTATS COTE A COTE -->
+    <div class="results-wrapper">
+        <div class="result-card card-source">
+            <div class="res-header"><span id="flagSrc">🇪🇺</span> <span id="nameSrc">EURO</span></div>
+            <div class="res-total" id="totalSrc">0 €</div>
+            <div class="res-details">
+                <div><div class="detail-val" id="invSrc">0 €</div><div class="detail-lbl">Investi</div></div>
+                <div><div class="detail-val" style="color:#a5ff3d" id="intSrc">0 €</div><div class="detail-lbl">Intérêts</div></div>
+            </div>
+        </div>
+        <div class="result-card card-target">
+            <div class="res-header"><span id="flagTgt">🇺🇸</span> <span id="nameTgt">DOLLAR</span></div>
+            <div class="res-total" id="totalTgt">0 $</div>
+            <div class="res-details">
+                <div><div class="detail-val" id="invTgt">0 $</div><div class="detail-lbl">Investi</div></div>
+                <div><div class="detail-val" id="intTgt">0 $</div><div class="detail-lbl">Intérêts</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PHRASE EXPLICATIVE -->
+    <div class="explanation-box" id="summaryText">
+        Calcul en cours...
+    </div>
+
+    <!-- GRAPHIQUE VISUEL -->
+    <div class="chart-container">
+        <canvas id="growthChart"></canvas>
+    </div>
+
+    <!-- FRISES CHRONOLOGIQUES -->
+    <div class="timelines-wrapper">
+        <div class="timeline-col source">
+            <div class="tl-title">📅 Évolution <span id="tlSrcName">€</span></div>
+            <div class="timeline" id="tlSrc"></div>
+        </div>
+        <div class="timeline-col target">
+            <div class="tl-title">📅 Évolution <span id="tlTgtName">$</span></div>
+            <div class="timeline" id="tlTgt"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Setup Chart.js ---
+    let myChart = null;
+    const ctx = document.getElementById('growthChart').getContext('2d');
+
+    // Données de change
+    const rates = { EUR: 1, USD: 1.08, GBP: 0.86, JPY: 162, VND: 27500, CNY: 7.85 };
+    const flags = { EUR: "🇪🇺", USD: "🇺🇸", GBP: "🇬🇧", JPY: "🇯🇵", VND: "🇻🇳", CNY: "🇨🇳" };
+    const names = { EUR: "EURO", USD: "DOLLAR", GBP: "LIVRE", JPY: "YEN", VND: "DONG", CNY: "YUAN" };
+    
+    let srcCode = "EUR", srcSym = "€", tgtCode = "USD", tgtSym = "$";
+
+    function updateRate() {
+        const sel = document.getElementById('accountType');
+        const val = sel.value;
+        if(val !== "custom") {
+            document.getElementById('rate').value = parseFloat(val) * 100;
+            calculate();
+        } else {
+            document.getElementById('rate').focus();
+        }
+    }
+
+    function calculate() {
+        // 1. Récupération Dévises
+        const s = document.getElementById('srcCurrency').value.split('|');
+        srcCode = s[0]; srcSym = s[1];
+        const t = document.getElementById('tgtCurrency').value.split('|');
+        tgtCode = t[0]; tgtSym = t[1];
+
+        // MàJ UI
+        document.getElementById('symInit').innerText = srcSym;
+        document.getElementById('symMonth').innerText = srcSym;
+        document.getElementById('flagSrc').innerText = flags[srcCode];
+        document.getElementById('nameSrc').innerText = names[srcCode];
+        document.getElementById('flagTgt').innerText = flags[tgtCode];
+        document.getElementById('nameTgt').innerText = names[tgtCode];
+        document.getElementById('tlSrcName').innerText = srcSym;
+        document.getElementById('tlTgtName').innerText = tgtSym;
+
+        // 2. Validation Durée
+        let y = parseInt(document.getElementById('years').value) || 0;
+        if (y > 150) { y = 150; document.getElementById('years').value = 150; document.getElementById('yearError').style.display = 'block'; }
+        else { document.getElementById('yearError').style.display = 'none'; }
+
+        const init = parseFloat(document.getElementById('initial').value) || 0;
+        const month = parseFloat(document.getElementById('monthly').value) || 0;
+        const r = parseFloat(document.getElementById('rate').value) / 100;
+
+        // 3. Calculs principaux
+        const res = computeValues(init, month, r, y);
+        const rateRatio = rates[tgtCode] / rates[srcCode];
+
+        // 4. Affichage Résultats Chiffres
+        document.getElementById('totalSrc').innerText = format(res.total, srcSym);
+        document.getElementById('invSrc').innerText = format(res.invested, srcSym);
+        document.getElementById('intSrc').innerText = format(res.interest, srcSym);
+        document.getElementById('totalTgt').innerText = format(res.total * rateRatio, tgtSym);
+        document.getElementById('invTgt').innerText = format(res.invested * rateRatio, tgtSym);
+        document.getElementById('intTgt').innerText = format(res.interest * rateRatio, tgtSym);
+
+        // 5. Phrase Explicative
+        const summary = `
+            Vous avez sorti <span class='highlight'>${format(res.invested, srcSym)}</span> de votre poche sur ${y} ans.
+            Grâce aux intérêts composés, votre épargne a généré <span class='highlight-success'>${format(res.interest, srcSym)}</span> de gains automatiques.
+            C'est une augmentation de <span class='highlight-success'>${((res.interest / res.invested) * 100 || 0).toFixed(0)}%</span> par rapport à votre effort d'épargne.
+        `;
+        document.getElementById('summaryText').innerHTML = summary;
+
+        // 6. Mise à jour Graphique
+        updateChart(res.chartData, srcSym);
+
+        // 7. Frises
+        generateTimeline(res.steps, srcSym, 'tlSrc');
+        generateTimeline(res.steps.map(s => ({y: s.y, v: s.v * rateRatio})), tgtSym, 'tlTgt');
+    }
+
+    function computeValues(init, monthly, rate, years) {
+        const mr = rate / 12;
+        const m = years * 12;
+        
+        let total = init * Math.pow(1 + mr, m);
+        if (mr > 0 && m > 0) total += monthly * ((Math.pow(1 + mr, m) - 1) / mr);
+        else total += monthly * m;
+
+        const invested = init + (monthly * m);
+        
+        // Pour la frise
+        let steps = [];
+        let stepSize = (years <= 10) ? 1 : 5;
+        
+        // Pour le graphique (on veut plus de points pour que la courbe soit lisse)
+        let chartData = { labels: [], invested: [], interest: [] };
+
+        for(let i = 0; i <= years; i++) {
+            const cm = i * 12;
+            let cv = init * Math.pow(1 + mr, cm);
+            if (mr > 0 && cm > 0) cv += monthly * ((Math.pow(1 + mr, cm) - 1) / mr);
+            else cv += monthly * cm;
+            
+            const invAtI = init + (monthly * cm);
+            const intAtI = cv - invAtI;
+
+            // Data pour graphique (tous les ans pour la courbe)
+            chartData.labels.push("An " + i);
+            chartData.invested.push(invAtI);
+            chartData.interest.push(intAtI);
+
+            // Data pour frise (étapes sélectionnées)
+            if (i % stepSize === 0 || i === years) {
+                steps.push({y: i, v: cv});
+            }
+        }
+
+        return { total, invested, interest: total - invested, steps, chartData };
+    }
+
+    function format(val, sym) {
+        const dec = (sym === '¥' || sym === '₫') ? 0 : 0;
+        return val.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " " + sym;
+    }
+
+    function updateChart(data, symbol) {
+        if (myChart) myChart.destroy();
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [
+                    {
+                        label: 'Capital Investi',
+                        data: data.invested,
+                        borderColor: '#6C63FF',
+                        backgroundColor: 'rgba(108, 99, 255, 0.2)',
+                        fill: true,
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Intérêts Gagnés',
+                        data: data.interest,
+                        borderColor: '#00f2fe',
+                        backgroundColor: 'rgba(0, 242, 254, 0.2)',
+                        fill: true,
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: 'Répartition Capital vs Intérêts dans le temps ('+symbol+')' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) label += ': ';
+                                label += format(context.parsed.y, symbol);
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value, index, values) {
+                                return format(value, symbol);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function generateTimeline(data, symbol, containerId) {
+        const c = document.getElementById(containerId);
+        c.innerHTML = '';
+        data.forEach((step, i) => {
+            const div = document.createElement('div');
+            div.className = 'tl-item';
+            div.style.animationDelay = (i * 0.05) + 's';
+            const label = step.y === 0 ? "Départ" : "Année " + step.y;
+            div.innerHTML = `<span class="tl-year">${label}</span><span class="tl-val">${format(step.v, symbol)}</span>`;
+            c.appendChild(div);
+        });
+    }
+</script>
+
+</body>
+</html>
